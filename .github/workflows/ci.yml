@@ -42,7 +42,7 @@ jobs:
         run: |
           xcodebuild build \
             -scheme AdaptivePanel \
-            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO
 
