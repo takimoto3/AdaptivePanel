@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-simulator:
+    name: Test (iOS Simulator)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16'
+
+      - name: Build for Testing
+        run: |
+          xcodebuild build-for-testing \
+            -scheme AdaptivePanel \
+            -destination 'platform=iOS Simulator,name=iPhone 16'
+
+      - name: Test without Building
+        run: |
+          xcodebuild test-without-building \
+            -scheme AdaptivePanel \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -enableCodeCoverage YES
+
+  build-device:
+    name: Build (iphoneos)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16'
+
+      - name: Build for Device
+        run: |
+          xcodebuild build \
+            -scheme AdaptivePanel \
+            -sdk iphoneos \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO
+
+  swiftpm-check:
+    name: SwiftPM Check
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16'
+      - name: SwiftPM Check
+        run: |
+          swift package resolve
