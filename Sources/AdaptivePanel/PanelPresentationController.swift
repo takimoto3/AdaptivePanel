@@ -433,7 +433,8 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
 
             let isScrollingContent = (interactionMode == .scrolls && !context.isIndicatorInteraction)
             if height > softMaxHeight && !isScrollingContent {
-                height = softMaxHeight + (height - softMaxHeight) * PanelConstants.rubberBandFactor
+                let overflow = height - softMaxHeight
+                height = softMaxHeight + sqrt(overflow) * 12
             }
             height = min(height, hardMaxHeight)
             if height < minHeight {
@@ -441,7 +442,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
             }
             updateContainerFrame(height: height, isInteractive: true)
 
-        case .ended, .cancelled, .failed:
+        case .ended:
             defer { resetPanState() }
             let velocity = gesture.velocity(in: container)
             let finalHeight = wrapperHeightConstraint?.constant ?? panelView.frame.height
@@ -469,6 +470,11 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
                 target = detentState.nearest(to: context.initialHeight, in: container)
             }
             animateTo(height: target, velocity: velocity.y)
+
+        case .cancelled, .failed:
+            defer { resetPanState() }
+            let velocity = gesture.velocity(in: container)
+            animateTo(height: context.initialHeight, velocity: velocity.y)
 
         default:
             resetPanState()
@@ -518,6 +524,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         }
 
         wrapperHeightConstraint?.constant = height
+        containerView.layoutIfNeeded()
 
         let isInteractable = backgroundInteraction.isInteractable(currentHeight: height, in: containerView)
 
@@ -663,8 +670,8 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         private let angularVelocity: CGFloat
 
         // MARK: - Init
-
-        init(dampingRatio: CGFloat, angularVelocity: CGFloat = 9.5) {
+        
+        init(dampingRatio: CGFloat, angularVelocity: CGFloat = 10.0) {
             self.dampingRatio = dampingRatio
             self.angularVelocity = angularVelocity
         }
@@ -697,14 +704,18 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
 
             if finishAtEnd {
                 onUpdate?(animation.targetHeight)
+                cleanup()
+                onCompletion?()
+            } else {
+                cleanup()
             }
-            cleanup()
         }
 
         // MARK: - DisplayLink
 
         @objc
         private func handleDisplayLink(_ displayLink: CADisplayLink) {
+            guard displayLink === self.displayLink else { return }
             guard let animation else {
                 cleanup()
                 return
@@ -713,7 +724,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
             let elapsed = CACurrentMediaTime() - animation.startTime
 
             let rawProgress = min(max(elapsed / animation.duration, 0),1)
-            let progress = springProgress(rawProgress)
+            let progress = adjustedSpringProgress(rawProgress, for: animation)
             let height = animation.startHeight + (animation.targetHeight - animation.startHeight) * progress
             
             onUpdate?(height)
@@ -727,15 +738,25 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
 
         // MARK: - Spring
 
-        private func springProgress(_ progress: CGFloat) -> CGFloat {
-            guard dampingRatio < 1 else {
-                return progress
+        private func adjustedSpringProgress(_ progress: CGFloat, for animation: Animation) -> CGFloat {
+            let springProgress = springProgress(progress)
+
+            let isExpanding =
+                animation.targetHeight > animation.startHeight
+
+            guard isExpanding else {
+                return springProgress
             }
 
+            return min(springProgress, 2)
+        }
+
+        private func springProgress(_ progress: CGFloat) -> CGFloat {
+            guard dampingRatio < 1 else { return progress }
             let dampedVelocity = angularVelocity * sqrt(1 - dampingRatio * dampingRatio)
             let envelope = exp(-dampingRatio * angularVelocity * progress)
-            let oscillation = cos(dampedVelocity * progress) + (dampingRatio/sqrt(1 - dampingRatio * dampingRatio)) * sin(dampedVelocity * progress)
-
+            let oscillation = cos(dampedVelocity * progress) +
+                (dampingRatio / sqrt(1 - dampingRatio * dampingRatio)) * sin(dampedVelocity * progress)
             return 1 - envelope * oscillation
         }
 
