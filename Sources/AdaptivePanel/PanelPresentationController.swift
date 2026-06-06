@@ -110,6 +110,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
     }
 
     var isInteractiveDismissDisabled = false
+    internal var isTransitioningDetent = false
     var panelCornerRadius: CGFloat? {
         didSet {
             applyCornerRadius(panelCornerRadius ?? PanelConstants.cornerRadius)
@@ -139,6 +140,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
             self?.updateContainerFrame(height: height)
         }
         animator.onCompletion = { [weak self] in
+            self?.isTransitioningDetent = false
             self?.notifyDetentChange()
         }
         return animator
@@ -393,6 +395,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         if case .dragging = panState { return }
         guard let containerView,
               !heightAnimator.isAnimating,
+              !isTransitioningDetent,
               !presentedViewController.isBeingDismissed else { return }
 
         guard !detentState.isEmpty else {
@@ -490,6 +493,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         dismissKeyboardIfNeeded()
 
         let currentHeight = wrapperHeightConstraint?.constant ?? 0
+        isTransitioningDetent = true
 
         heightAnimator.animate(
             from: currentHeight,
@@ -645,17 +649,10 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
     
     @MainActor
     final class HeightAnimator {
-        struct Animation {
-            let startHeight: CGFloat
-            let targetHeight: CGFloat
-            let startTime: CFTimeInterval
-            let duration: TimeInterval
-        }
-
         // MARK: - Public
 
         var isAnimating: Bool {
-            animation != nil
+            animator != nil
         }
 
         var onUpdate: ((CGFloat) -> Void)?
@@ -663,17 +660,14 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
 
         // MARK: - Private
 
-        private var displayLink: CADisplayLink?
-        private var animation: Animation?
+        private var animator: UIViewPropertyAnimator?
 
         private let dampingRatio: CGFloat
-        private let angularVelocity: CGFloat
 
         // MARK: - Init
         
-        init(dampingRatio: CGFloat, angularVelocity: CGFloat = 10.0) {
+        init(dampingRatio: CGFloat) {
             self.dampingRatio = dampingRatio
-            self.angularVelocity = angularVelocity
         }
 
         // MARK: - Animation
@@ -681,91 +675,37 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         func animate(from startHeight: CGFloat, to targetHeight: CGFloat, duration: TimeInterval) {
             stop(finishAtEnd: false)
 
-            let distance = targetHeight - startHeight
-
-            guard abs(distance) >= 1 else {
-                onUpdate?(targetHeight)
-                onCompletion?()
-                return
+            let timing = UISpringTimingParameters(
+                dampingRatio: dampingRatio,
+                initialVelocity: .zero
+            )
+            
+            let animator = UIViewPropertyAnimator(duration: duration, timingParameters: timing)
+            
+            animator.addAnimations {
+                self.onUpdate?(targetHeight)
             }
-
-            animation = Animation(startHeight: startHeight,targetHeight: targetHeight,startTime: CACurrentMediaTime(),duration: duration)
-
-            let displayLink = CADisplayLink(target: self,selector: #selector(handleDisplayLink(_:)))
-            displayLink.add(to: .main, forMode: .common)
-            self.displayLink = displayLink
+            
+            animator.addCompletion { [weak self] position in
+                if position == .end {
+                    self?.onCompletion?()
+                }
+                self?.animator = nil
+            }
+            
+            self.animator = animator
+            animator.startAnimation()
         }
 
         func stop(finishAtEnd: Bool) {
-            guard let animation else {
-                cleanup()
-                return
-            }
-
+            guard let animator else { return }
             if finishAtEnd {
-                onUpdate?(animation.targetHeight)
-                cleanup()
-                onCompletion?()
+                animator.stopAnimation(false)
+                animator.finishAnimation(at: .end)
             } else {
-                cleanup()
+                animator.stopAnimation(true)
             }
-        }
-
-        // MARK: - DisplayLink
-
-        @objc
-        private func handleDisplayLink(_ displayLink: CADisplayLink) {
-            guard displayLink === self.displayLink else { return }
-            guard let animation else {
-                cleanup()
-                return
-            }
-
-            let elapsed = CACurrentMediaTime() - animation.startTime
-
-            let rawProgress = min(max(elapsed / animation.duration, 0),1)
-            let progress = adjustedSpringProgress(rawProgress, for: animation)
-            let height = animation.startHeight + (animation.targetHeight - animation.startHeight) * progress
-            
-            onUpdate?(height)
-            
-            if rawProgress >= 1 {
-                onUpdate?(animation.targetHeight)
-                cleanup()
-                onCompletion?()
-            }
-        }
-
-        // MARK: - Spring
-
-        private func adjustedSpringProgress(_ progress: CGFloat, for animation: Animation) -> CGFloat {
-            let springProgress = springProgress(progress)
-
-            let isExpanding =
-                animation.targetHeight > animation.startHeight
-
-            guard isExpanding else {
-                return springProgress
-            }
-
-            return min(springProgress, 2)
-        }
-
-        private func springProgress(_ progress: CGFloat) -> CGFloat {
-            guard dampingRatio < 1 else { return progress }
-            let dampedVelocity = angularVelocity * sqrt(1 - dampingRatio * dampingRatio)
-            let envelope = exp(-dampingRatio * angularVelocity * progress)
-            let oscillation = cos(dampedVelocity * progress) +
-                (dampingRatio / sqrt(1 - dampingRatio * dampingRatio)) * sin(dampedVelocity * progress)
-            return 1 - envelope * oscillation
-        }
-
-        // MARK: - Cleanup
-
-        private func cleanup() {
-            displayLink?.invalidate()
-            displayLink = nil
-            animation = nil
+            self.animator = nil
         }
     }
 }
