@@ -604,13 +604,15 @@ struct PanelPresentationControllerTests {
         #expect(pc.heightAnimator.isAnimating == true) // snap animator is running
     }
     
-    @Test func handlePan_cancelled_resetsPanState() {
+    @Test func handlePan_cancelled_springsBackToInitialHeightAndResetsPanState() {
         let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         let pc = TestablePanelPresentationController(
             containerView: container,
             presentedViewController: UIViewController(),
             presenting: UIViewController()
         )
+        pc.wrapperHeightConstraint = NSLayoutConstraint()
+        pc.wrapperHeightConstraint?.constant = 240
         
         pc.panState = .dragging(PanelPresentationController.PanContext(
             initialHeight: 300,
@@ -623,17 +625,24 @@ struct PanelPresentationControllerTests {
         pc.presentedView?.addGestureRecognizer(pan)
         
         #expect(pc.panState != .idle)
+        #expect(pc.heightAnimator.isAnimating == false)
         pc.handlePan(pan)
         #expect(pc.panState == .idle)
+        #expect(pc.heightAnimator.isAnimating == true)
+        
+        pc.heightAnimator.stop(finishAtEnd: true)
+        #expect(pc.wrapperHeightConstraint?.constant == 300)
     }
     
-    @Test func handlePan_failed_resetsPanState() {
+    @Test func handlePan_failed_springsBackToInitialHeightAndResetsPanState() {
         let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         let pc = TestablePanelPresentationController(
             containerView: container,
             presentedViewController: UIViewController(),
             presenting: UIViewController()
         )
+        pc.wrapperHeightConstraint = NSLayoutConstraint()
+        pc.wrapperHeightConstraint?.constant = 260
         
         pc.panState = .dragging(PanelPresentationController.PanContext(
             initialHeight: 300,
@@ -646,8 +655,13 @@ struct PanelPresentationControllerTests {
         pc.presentedView?.addGestureRecognizer(pan)
         
         #expect(pc.panState != .idle)
+        #expect(pc.heightAnimator.isAnimating == false)
         pc.handlePan(pan)
         #expect(pc.panState == .idle)
+        #expect(pc.heightAnimator.isAnimating == true)
+        
+        pc.heightAnimator.stop(finishAtEnd: true)
+        #expect(pc.wrapperHeightConstraint?.constant == 300)
     }
     
     // MARK: .changed - Height does not change when scroll view is not at top
