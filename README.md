@@ -109,8 +109,9 @@ A comprehensive example app demonstrating all features of `AdaptivePanel` is ava
 
 ## Requirements
 
-- iOS 18.0+
+- iOS 18.0+ (Optimized for iPhone)
 - Xcode 16.3+ (Swift 6.2)
+- *Note: iPad support is currently experimental.*
 
 ## Installation
 
