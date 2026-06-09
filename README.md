@@ -30,12 +30,12 @@ The standard SwiftUI `.sheet` is convenient but restrictive in landscape mode. `
 | **Presentation** | `.sheet(isPresented:onDismiss:content:)`<br>`.sheet(item:onDismiss:content:)` | **`.panel(isPresented:onDismiss:content:)`**<br>**`.panel(item:onDismiss:content:)`** |
 | **Detents** | `.presentationDetents(_:)`<br>`.presentationDetents(_:selection:)` | **`.panelDetents(_:)`**<br>**`.panelDetents(_:selection:)`** |
 | **Drag Indicator** | `.presentationDragIndicator(_:)` | **`.panelDragIndicator(_:)`** |
-| **Background** | `.presentationBackground(_:)` | **`.panelBackground(_:)`** |
+| **Background** | `.presentationBackground(_:)`<br>`.presentationBackground(alignment:content:)` | **`.panelBackground(_:)`** |
 | **Interaction** | `.presentationBackgroundInteraction(_:)` | **`.panelBackgroundInteraction(_:)`** |
 | **Content Interaction** | `.presentationContentInteraction(_:)` | **`.panelContentInteraction(_:)`** |
 | **Corner Radius** | `.presentationCornerRadius(_:)` | **`.panelCornerRadius(_:)`** |
 | **Dismiss Control** | `.interactiveDismissDisabled(_:)` | **`.panelInteractiveDismissDisabled(_:)`** |
-| **Compact Adaptation** | `.presentationCompactAdaptation(_:)` |                         |
+| **Compact Adaptation** | `.presentationCompactAdaptation(_:)`<br>`.presentationCompactAdaptation(horizontal:vertical:)` |                         |
 | **Sizing** | `.presentationSizing(_:)` |                         |
 | **Landscape Layout** |                         | **`.panelLandscapeLayout(_:width:...)`** |
 
