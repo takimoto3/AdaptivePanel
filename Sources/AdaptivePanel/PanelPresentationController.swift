@@ -22,6 +22,7 @@ protocol PanelPreferenceReceiver: AnyObject {
     var onDetentChange: ((PanelDetent) -> Void)? { get set }
 
     func updateBackgroundStyle(_ style: AnyShapeStyle)
+    func updateBackground<Content: View>(alignment: Alignment, @ViewBuilder content: () -> Content)
 }
 
 /// Controls panel layout, background behavior, drag interaction, and dismissal.
@@ -151,13 +152,6 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
 
     internal let panelView = UIView()
     private let dimmingView = DimmingView()
-    internal let backgroundView = UIHostingConfiguration {
-        Rectangle()
-            .fill(PanelBackgroundStyleKey.defaultValue.style)
-            .ignoresSafeArea()
-    }
-    .margins(.all, 0)
-    .makeContentView()
 
     private lazy var panGesture: UIPanGestureRecognizer = {
         let gesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
@@ -175,12 +169,39 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         setupViews()
     }
     
+    internal let backgroundView = UIHostingConfiguration {
+        ZStack {
+            AnyView(
+                Rectangle()
+                    .fill(PanelBackgroundStyleKey.defaultValue.style)
+            )
+        }
+        .ignoresSafeArea()
+    }
+    .margins(.all, 0)
+    .makeContentView()
+    
     /// Updates only the background style while preserving the presentation hierarchy.
     func updateBackgroundStyle(_ style: AnyShapeStyle) {
         backgroundView.configuration = UIHostingConfiguration {
-            Rectangle()
-                .fill(style)
-                .ignoresSafeArea()
+            ZStack {
+                AnyView(
+                    Rectangle()
+                        .fill(style)
+                        .ignoresSafeArea()
+                )
+            }
+            .ignoresSafeArea()
+        }
+        .margins(.all, 0)
+    }
+    
+    func updateBackground<Content: View>(alignment: Alignment, @ViewBuilder content: () -> Content) {
+        backgroundView.configuration = UIHostingConfiguration {
+            ZStack(alignment: alignment) {
+                AnyView(content())
+            }
+            .ignoresSafeArea()
         }
         .margins(.all, 0)
     }

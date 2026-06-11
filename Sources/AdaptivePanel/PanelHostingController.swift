@@ -25,7 +25,11 @@ class PanelHostingController<Content: View>: UIHostingController<PanelHostingCon
                 .ignoresSafeArea(.keyboard)
                 .background(.clear)
                 .onPreferenceChange(PanelBackgroundStyleKey.self) { value in
-                    ownerBox.controller?.applyPresenter{ $0.updateBackgroundStyle(value.style) }
+                    ownerBox.controller?.applyPresenter { $0.updateBackgroundStyle(value.style) }
+                }
+                .onPreferenceChange(PanelBackgroundConfigurationKey.self) { value in
+                    guard let config = value else { return }
+                    ownerBox.controller?.applyPresenter { $0.updateBackground(alignment: config.alignment, content: config.content) }
                 }
                 .onPreferenceChange(PanelLandscapeKey.self) { value in
                     ownerBox.controller?.applyPresenter { $0.landscapeConfiguration = value }
