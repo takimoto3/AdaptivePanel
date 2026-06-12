@@ -144,9 +144,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         animator.onCompletion = { [weak self] in
             self?.isTransitioningDetent = false
             self?.isLayoutStabilizing = true
-            DispatchQueue.main.async {
-                self?.isLayoutStabilizing = false
-            }
+            self?.isLayoutStabilizing = false
             self?.notifyDetentChange()
         }
         return animator
