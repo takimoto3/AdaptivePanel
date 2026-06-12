@@ -20,6 +20,7 @@ protocol PanelPreferenceReceiver: AnyObject {
     var backgroundInteraction: PanelBackgroundInteraction { get set }
     var selectedDetent: PanelDetent? { get set }
     var onDetentChange: ((PanelDetent) -> Void)? { get set }
+    var backgroundController: PanelBackgroundHostingController { get }
 
     func updateBackgroundStyle(_ style: AnyShapeStyle)
     func updateBackground<Content: View>(alignment: Alignment, @ViewBuilder content: () -> Content)

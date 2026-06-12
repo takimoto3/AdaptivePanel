@@ -12,13 +12,15 @@ import SwiftUI
 struct BackgroundStyle: Equatable {
     let style: AnyShapeStyle
     let id: UUID
-    
-    init(_ style: any ShapeStyle, id: UUID = UUID()) {
+    let backdrop: UIColor?
+
+    init(_ style: any ShapeStyle, backdrop: UIColor?, id: UUID = UUID()) {
         self.style = AnyShapeStyle(style)
+        self.backdrop = backdrop
         self.id = id
     }
-
-    static func == (lhs: BackgroundStyle, rhs: BackgroundStyle) -> Bool {
+    
+    static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.id == rhs.id
     }
 }
@@ -27,14 +29,16 @@ struct BackgroundConfiguration: Equatable {
     let alignment: Alignment
     let content: () -> AnyView
     let id: UUID
+    let backdrop: UIColor?
     
-    init(alignment: Alignment, content: @escaping () -> AnyView, id: UUID = UUID()) {
+    init(alignment: Alignment, backdrop: UIColor?, content: @escaping () -> AnyView, id: UUID = UUID()) {
         self.alignment = alignment
         self.content = content
+        self.backdrop = backdrop
         self.id = id
     }
     
-    static func == (lhs: BackgroundConfiguration, rhs: BackgroundConfiguration) -> Bool {
+    static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.id == rhs.id
     }
 }
@@ -42,7 +46,7 @@ struct BackgroundConfiguration: Equatable {
 extension BackgroundConfiguration: @unchecked Sendable {}
 
 struct PanelBackgroundStyleKey: PreferenceKey {
-    static let defaultValue: BackgroundStyle = BackgroundStyle(Color(uiColor: .systemBackground))
+    static let defaultValue: BackgroundStyle = BackgroundStyle(Color(uiColor: .systemBackground), backdrop: nil)
 
     static func reduce(value: inout BackgroundStyle, nextValue: () -> BackgroundStyle) {
         value = nextValue()
@@ -59,14 +63,14 @@ struct PanelBackgroundConfigurationKey: PreferenceKey {
 
 extension View {
     /// Sets the background style for the panel.
-    public func panelBackground<S: ShapeStyle>(_ style: S) -> some View {
-        self.preference(key: PanelBackgroundStyleKey.self, value: BackgroundStyle(style))
+    public func panelBackground<S: ShapeStyle>(_ style: S, backdropColor: UIColor? = nil) -> some View {
+        self.preference(key: PanelBackgroundStyleKey.self, value: BackgroundStyle(style, backdrop: backdropColor))
     }
     
-    public func panelBackground<Content: View>(alignment: Alignment = .center, @ViewBuilder content: @escaping () -> Content) -> some View {
+    public func panelBackground<Content: View>(alignment: Alignment = .center, backdropColor: UIColor? = nil, @ViewBuilder content: @escaping () -> Content) -> some View {
         self.preference(
             key: PanelBackgroundConfigurationKey.self,
-            value: BackgroundConfiguration(alignment: alignment, content: {AnyView(content())})
+            value: BackgroundConfiguration(alignment: alignment, backdrop: backdropColor, content: {AnyView(content())})
         )
     }
 }

@@ -31,7 +31,7 @@ final class MockContainerView: UIView {
 
 @MainActor
 final class MockPanelPreferenceReceiver: PanelPreferenceReceiver {
-    
+    let backgroundController: PanelBackgroundHostingController = PanelBackgroundHostingController()
     var panelDetents: [PanelDetent] = []
     var landscapeConfiguration: PanelLandscapeConfiguration = .default
     var interactionMode: PanelInteraction = .resizing
