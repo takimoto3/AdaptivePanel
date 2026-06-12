@@ -25,7 +25,17 @@ class PanelHostingController<Content: View>: UIHostingController<PanelHostingCon
                 .ignoresSafeArea(.keyboard)
                 .background(.clear)
                 .onPreferenceChange(PanelBackgroundStyleKey.self) { value in
-                    ownerBox.controller?.applyPresenter{ $0.updateBackgroundStyle(value.style) }
+                    if let color = value.backdrop {
+                        ownerBox.controller?.applyPresenter { $0.backgroundController.backgroundColor = color }
+                    }
+                    ownerBox.controller?.applyPresenter { $0.updateBackgroundStyle(value.style) }
+                }
+                .onPreferenceChange(PanelBackgroundConfigurationKey.self) { value in
+                    guard let config = value else { return }
+                    if let color = config.backdrop {
+                        ownerBox.controller?.applyPresenter { $0.backgroundController.backgroundColor = color }
+                    }
+                    ownerBox.controller?.applyPresenter { $0.updateBackground(alignment: config.alignment, content: config.content) }
                 }
                 .onPreferenceChange(PanelLandscapeKey.self) { value in
                     ownerBox.controller?.applyPresenter { $0.landscapeConfiguration = value }
@@ -60,7 +70,7 @@ class PanelHostingController<Content: View>: UIHostingController<PanelHostingCon
     init(@ViewBuilder content: @escaping () -> Content) {
         let ownerBox = BridgeView.OwnerBox()
         super.init(rootView: BridgeView(content: content, ownerBox: ownerBox))
-        ownerBox.controller = applyTarget()
+        ownerBox.controller = self
         self.sizingOptions = []
         self.view.insetsLayoutMarginsFromSafeArea = false
         self.view.backgroundColor = .clear
@@ -76,11 +86,6 @@ class PanelHostingController<Content: View>: UIHostingController<PanelHostingCon
         (presentationController as? PanelPresentationController)?.restoreScrollViews()
     }
     
-    func applyTarget() -> PanelHostingController<Content> {
-        return self
-    }
-
-
     internal func update(@ViewBuilder content: @escaping () -> Content) {
         self.rootView = BridgeView(content: content, ownerBox: self.rootView.ownerBox)
     }

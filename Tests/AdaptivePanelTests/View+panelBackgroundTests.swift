@@ -15,21 +15,21 @@ struct BackgroundStyleTests {
 
     @Test func equality_sameId() {
         let id = UUID()
-        let style1 = BackgroundStyle(Color.red, id: id)
-        let style2 = BackgroundStyle(Color.red, id: id)
+        let style1 = BackgroundStyle(Color.red, backdrop: nil, id: id)
+        let style2 = BackgroundStyle(Color.red, backdrop: nil, id: id)
         #expect(style1 == style2)
     }
 
     @Test func equality_differentId_sameStyle() {
-        let style1 = BackgroundStyle(Color.red)
-        let style2 = BackgroundStyle(Color.red)
+        let style1 = BackgroundStyle(Color.red, backdrop: nil)
+        let style2 = BackgroundStyle(Color.red, backdrop: nil)
         #expect(style1 != style2)
     }
 
     @Test func equality_differentStyle_sameId() {
         let id = UUID()
-        let style1 = BackgroundStyle(Color.red, id: id)
-        let style2 = BackgroundStyle(Color.blue, id: id)
+        let style1 = BackgroundStyle(Color.red, backdrop: nil, id: id)
+        let style2 = BackgroundStyle(Color.blue, backdrop: nil, id: id)
         #expect(style1 == style2)
     }
 

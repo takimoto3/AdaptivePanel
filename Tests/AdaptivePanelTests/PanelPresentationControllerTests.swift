@@ -1214,8 +1214,8 @@ struct PanelPresentationControllerTests {
     @Test func panelCornerRadius_appliedToBackgroundView() {
         let pc = makePresentationController()
         pc.panelCornerRadius = 20
-        #expect(pc.backgroundView.layer.cornerRadius == 20)
-        #expect(pc.backgroundView.layer.masksToBounds == true)
+        #expect(pc.backgroundController.view.layer.cornerRadius == 20)
+        #expect(pc.backgroundController.view.layer.masksToBounds == true)
     }
     
     // MARK: - backgroundInteraction
