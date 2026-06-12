@@ -20,13 +20,13 @@ jobs:
         run: |
           xcodebuild build-for-testing \
             -scheme AdaptivePanel \
-            -destination 'platform=iOS Simulator,name=iPhone 16'
+            -destination 'platform=iOS Simulator,name=iPhone 17'
 
       - name: Test without Building
         run: |
           xcodebuild test-without-building \
             -scheme AdaptivePanel \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
             -enableCodeCoverage YES
 
   build-device:
