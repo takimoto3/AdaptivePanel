@@ -30,16 +30,16 @@ The standard SwiftUI `.sheet` is convenient but restrictive in landscape mode. `
 | **Presentation** | `.sheet(isPresented:onDismiss:content:)`<br>`.sheet(item:onDismiss:content:)` | **`.panel(isPresented:onDismiss:content:)`**<br>**`.panel(item:onDismiss:content:)`** |
 | **Detents** | `.presentationDetents(_:)`<br>`.presentationDetents(_:selection:)` | **`.panelDetents(_:)`**<br>**`.panelDetents(_:selection:)`** |
 | **Drag Indicator** | `.presentationDragIndicator(_:)` | **`.panelDragIndicator(_:)`** |
-| **Background**[^1] | `.presentationBackground(_:)`<br>`.presentationBackground(alignment:content:)` | **`.panelBackground(_:)`**<br>**`.panelBackground(alignment:content:)`** |
+| **Background***1 | `.presentationBackground(_:)`<br>`.presentationBackground`<br>`  (alignment:content:)` | **`.panelBackground(_:)`**<br>**`.panelBackground`<br>`  (alignment:content:)** |
 | **Interaction** | `.presentationBackgroundInteraction(_:)` | **`.panelBackgroundInteraction(_:)`** |
 | **Content Interaction** | `.presentationContentInteraction(_:)` | **`.panelContentInteraction(_:)`** |
 | **Corner Radius** | `.presentationCornerRadius(_:)` | **`.panelCornerRadius(_:)`** |
 | **Dismiss Control** | `.interactiveDismissDisabled(_:)` | **`.panelInteractiveDismissDisabled(_:)`** |
-| **Compact Adaptation** | `.presentationCompactAdaptation(_:)`<br>`.presentationCompactAdaptation(horizontal:vertical:)` |                         |
+| **Compact Adaptation** | `.presentationCompactAdaptation(_:)`<br>`.presentationCompactAdaptation`<br>`  (horizontal:vertical:)` |                         |
 | **Sizing** | `.presentationSizing(_:)` |                         |
-| **Landscape Layout** |                         | **`.panelLandscapeLayout(_:width:...)`** |
+| **Landscape Layout** |                         | **`.panelLandscapeLayout`<br>`  (_:width:...)`** |
 
-[^1]: AdaptivePanel's background modifiers additionally support `backdropColor` to control the underlying UIKit view's background color.
+<small>*1: AdaptivePanel's background modifiers additionally support <code>backdropColor</code> to control the underlying UIKit view's background color.</small>
 
 ## Basic Usage
 
@@ -82,8 +82,8 @@ The `backdropColor` parameter controls the background color of the underlying UI
 
 | **Standard SwiftUI Sheet** | **AdaptivePanel (Default Backdrop)** | **AdaptivePanel (Clear Backdrop)** |
 | :---: | :---: | :---: |
-| <img src="docs/sheet_backdrop_solid.png" width="220"> | <img src="docs/backdrop_solid.png" width="220"> | <img src="docs/backdrop_clear.png" width="220"> |
-| `.presentationBackground(.blue.opacity(0.8))` | `.panelBackground(.blue.opacity(0.8))` | `.panelBackground(.blue.opacity(0.8), backdropColor: .clear)` |
+| <img src="docs/sheet_backdrop_solid.png" width="200"> | <img src="docs/backdrop_solid.png" width="200"> | <img src="docs/backdrop_clear.png" width="200"> |
+| `.presentationBackground`<br>`.blue.opacity(0.8))` | `.panelBackground`<br>`.blue.opacity(0.8))` | `.panelBackground(.blue.opacity(0.8),`<br>`backdropColor: .clear)` |
 | *System background is still visible behind the blue* | *Same as standard SwiftUI sheet* | *Reveals the screen behind the panel* |
 
 ## Deep Dive: Landscape Layout Matrix
