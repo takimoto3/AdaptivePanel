@@ -31,6 +31,7 @@ final class MockContainerView: UIView {
 
 @MainActor
 final class MockPanelPreferenceReceiver: PanelPreferenceReceiver {
+    
     var panelDetents: [PanelDetent] = []
     var landscapeConfiguration: PanelLandscapeConfiguration = .default
     var interactionMode: PanelInteraction = .resizing
@@ -44,6 +45,10 @@ final class MockPanelPreferenceReceiver: PanelPreferenceReceiver {
 
     func updateBackgroundStyle(_ style: AnyShapeStyle) {
         updatedBackgroundStyle = style
+    }
+    
+    func updateBackground<Content>(alignment: Alignment, content: () -> Content) where Content : View {
+        
     }
 }
 
@@ -60,10 +65,6 @@ final class TestablePanelHostingController<Content: View>: PanelHostingControlle
         fatalError("init(coder:) has not been implemented")
     }
     
-    override func applyTarget() -> PanelHostingController<Content> {
-        return self
-    }
-
     override func applyPresenter(_ apply: (PanelPreferenceReceiver) -> Void) {
         apply(mockReceiver)
     }

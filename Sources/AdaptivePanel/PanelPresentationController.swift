@@ -123,7 +123,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         panelView.layer.masksToBounds = false
         panelView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
 
-        for view in [backgroundView, presentedViewController.view] {
+        for view in [backgroundController.view, presentedViewController.view] {
             view?.layer.cornerRadius = radius
             view?.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
             view?.layer.masksToBounds = true
@@ -142,6 +142,10 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         }
         animator.onCompletion = { [weak self] in
             self?.isTransitioningDetent = false
+            self?.isLayoutStabilizing = true
+            DispatchQueue.main.async {
+                self?.isLayoutStabilizing = false
+            }
             self?.notifyDetentChange()
         }
         return animator
@@ -159,6 +163,8 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         gesture.cancelsTouchesInView = false
         return gesture
     }()
+    
+    private var isLayoutStabilizing = false
 
     override var presentedView: UIView? { panelView }
 
@@ -169,41 +175,15 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         setupViews()
     }
     
-    internal let backgroundView = UIHostingConfiguration {
-        ZStack {
-            AnyView(
-                Rectangle()
-                    .fill(PanelBackgroundStyleKey.defaultValue.style)
-            )
-        }
-        .ignoresSafeArea()
-    }
-    .margins(.all, 0)
-    .makeContentView()
-    
+    internal let backgroundController = PanelBackgroundHostingController()
+        
     /// Updates only the background style while preserving the presentation hierarchy.
     func updateBackgroundStyle(_ style: AnyShapeStyle) {
-        backgroundView.configuration = UIHostingConfiguration {
-            ZStack {
-                AnyView(
-                    Rectangle()
-                        .fill(style)
-                        .ignoresSafeArea()
-                )
-            }
-            .ignoresSafeArea()
-        }
-        .margins(.all, 0)
+        backgroundController.updateBackgroundStyle(style)
     }
     
     func updateBackground<Content: View>(alignment: Alignment, @ViewBuilder content: () -> Content) {
-        backgroundView.configuration = UIHostingConfiguration {
-            ZStack(alignment: alignment) {
-                AnyView(content())
-            }
-            .ignoresSafeArea()
-        }
-        .margins(.all, 0)
+        backgroundController.updateBackground(alignment: alignment, content: content)
     }
 
     private func setupViews() {
@@ -246,15 +226,20 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
 
         dimmingView.presentingView = presentingViewController.view
         dimmingView.alpha = 0
-        backgroundView.isUserInteractionEnabled = false
+        backgroundController.view.isUserInteractionEnabled = false
 
-        [dimmingView, panelView].forEach { container.addSubview($0) }
-        [backgroundView, contentView, dragIndicatorView].forEach { panelView.addSubview($0) }
+        container.addSubview(dimmingView)
+        container.addSubview(panelView)
+        panelView.addSubview(backgroundController.view)
+        panelView.addSubview(contentView)
+        panelView.addSubview(dragIndicatorView)
         applyCornerRadius(panelCornerRadius ?? PanelConstants.cornerRadius)
 
-        [dimmingView, panelView, backgroundView, dragIndicatorView, contentView].forEach {
-            $0.translatesAutoresizingMaskIntoConstraints = false
-        }
+        dimmingView.translatesAutoresizingMaskIntoConstraints = false
+        panelView.translatesAutoresizingMaskIntoConstraints = false
+        backgroundController.view.translatesAutoresizingMaskIntoConstraints = false
+        dragIndicatorView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.translatesAutoresizingMaskIntoConstraints = false
         container.keyboardLayoutGuide.usesBottomSafeArea = false
 
         // The panel height is driven by the content view height constraint.
@@ -272,10 +257,10 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
             panelView.topAnchor.constraint(greaterThanOrEqualTo: container.safeAreaLayoutGuide.topAnchor),
             heightConstraint,
 
-            backgroundView.topAnchor.constraint(equalTo: panelView.topAnchor),
-            backgroundView.leadingAnchor.constraint(equalTo: panelView.leadingAnchor),
-            backgroundView.trailingAnchor.constraint(equalTo: panelView.trailingAnchor),
-            backgroundView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            backgroundController.view.topAnchor.constraint(equalTo: panelView.topAnchor),
+            backgroundController.view.leadingAnchor.constraint(equalTo: panelView.leadingAnchor),
+            backgroundController.view.trailingAnchor.constraint(equalTo: panelView.trailingAnchor),
+            backgroundController.view.bottomAnchor.constraint(equalTo: panelView.bottomAnchor),
 
             dragIndicatorView.topAnchor.constraint(equalTo: panelView.topAnchor, constant: PanelConstants.dragIndicatorTopPadding),
             dragIndicatorView.centerXAnchor.constraint(equalTo: panelView.centerXAnchor),
@@ -417,6 +402,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         guard let containerView,
               !heightAnimator.isAnimating,
               !isTransitioningDetent,
+              !isLayoutStabilizing,
               !presentedViewController.isBeingDismissed else { return }
 
         guard !detentState.isEmpty else {
@@ -708,10 +694,11 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
             }
             
             animator.addCompletion { [weak self] position in
+                guard let self else { return }
                 if position == .end {
-                    self?.onCompletion?()
+                    self.onCompletion?()
                 }
-                self?.animator = nil
+                self.animator = nil
             }
             
             self.animator = animator

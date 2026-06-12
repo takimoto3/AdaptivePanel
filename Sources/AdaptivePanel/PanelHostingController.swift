@@ -64,7 +64,7 @@ class PanelHostingController<Content: View>: UIHostingController<PanelHostingCon
     init(@ViewBuilder content: @escaping () -> Content) {
         let ownerBox = BridgeView.OwnerBox()
         super.init(rootView: BridgeView(content: content, ownerBox: ownerBox))
-        ownerBox.controller = applyTarget()
+        ownerBox.controller = self
         self.sizingOptions = []
         self.view.insetsLayoutMarginsFromSafeArea = false
         self.view.backgroundColor = .clear
@@ -80,11 +80,6 @@ class PanelHostingController<Content: View>: UIHostingController<PanelHostingCon
         (presentationController as? PanelPresentationController)?.restoreScrollViews()
     }
     
-    func applyTarget() -> PanelHostingController<Content> {
-        return self
-    }
-
-
     internal func update(@ViewBuilder content: @escaping () -> Content) {
         self.rootView = BridgeView(content: content, ownerBox: self.rootView.ownerBox)
     }
