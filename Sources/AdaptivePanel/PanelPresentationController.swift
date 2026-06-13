@@ -82,6 +82,9 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         get { detentState.detents }
         set {
             detentState.detents = newValue
+            if let container = containerView {
+                detentState.resolve(in: container)
+            }
             containerView?.setNeedsLayout()
         }
     }
@@ -89,9 +92,8 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
     var selectedDetent: PanelDetent? {
         get { detentState.current }
         set {
-            guard let newValue, let container = containerView,
-                  let height = detentState.move(to: newValue, in: container) else { return }
-                animateTo(height: height)
+            guard let newValue, let height = detentState.move(to: newValue) else { return }
+            animateTo(height: height)
         }
     }
     
@@ -112,7 +114,6 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
     }
 
     var isInteractiveDismissDisabled = false
-    internal var isTransitioningDetent = false
     var panelCornerRadius: CGFloat? {
         didSet {
             applyCornerRadius(panelCornerRadius ?? PanelConstants.cornerRadius)
@@ -134,22 +135,6 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
     var onDismiss: (() -> Void)?
     var backgroundInteraction: PanelBackgroundInteraction = PanelBackgroundInteractionKey.defaultValue
     
-    internal lazy var heightAnimator: HeightAnimator = {
-        let animator = HeightAnimator(
-            dampingRatio: PanelConstants.snapDampingRatio
-        )
-        animator.onUpdate = { [weak self] height in
-            self?.updateContainerFrame(height: height)
-        }
-        animator.onCompletion = { [weak self] in
-            self?.isTransitioningDetent = false
-            self?.isLayoutStabilizing = true
-            self?.isLayoutStabilizing = false
-            self?.notifyDetentChange()
-        }
-        return animator
-    }()
-    
     internal var wrapperHeightConstraint: NSLayoutConstraint?
     internal let dragIndicatorView: UIView
 
@@ -163,9 +148,11 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         return gesture
     }()
     
-    private var isLayoutStabilizing = false
-
     override var presentedView: UIView? { panelView }
+    
+    internal var heightAnimator: UIViewPropertyAnimator?
+
+    internal var isAnimating: Bool { heightAnimator != nil }
 
     internal init(presentedViewController: UIViewController, presenting: UIViewController?, dragIndicator: UIView? = nil) {
         self.dragIndicatorView = dragIndicator ?? DragIndicatorView()
@@ -210,8 +197,6 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         super.viewWillTransition(to: size, with: coordinator)
 
         stopCurrentAnimation(finishAtEnd: true)
-//        wrapperHeightConstraint?.constant = 0
-        
         coordinator.animate(alongsideTransition: { [weak self] _ in
             guard let self, let container = self.containerView else { return }
             self.updateHorizontalLayout(for: size)
@@ -302,6 +287,9 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
 
     override func containerViewDidLayoutSubviews() {
         super.containerViewDidLayoutSubviews()
+        if let containerView {
+            detentState.resolve(in: containerView)
+        }
         applyDetentLayout()
         dimmingView.activePanelFrame = panelView.frame
      }
@@ -313,7 +301,6 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
 
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard let pan = gestureRecognizer as? UIPanGestureRecognizer,
-              let containerView,
               let view = gestureRecognizer.view,
               case .idle = panState else { return false }
 
@@ -321,7 +308,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         let velocity = pan.velocity(in: view)
         let currentHeight = wrapperHeightConstraint?.constant ?? panelView.frame.height
         let isSwipingDown = velocity.y > 0
-        let maxHeight = detentState.maxHeight(in: containerView)
+        let maxHeight = detentState.maxHeight
         let isAtMax = currentHeight >= maxHeight - 1
         let indicatorArea = dragIndicatorView.frame.inset(by: PanelConstants.dragIndicatorHitArea)
         let isIndicator = indicatorArea.contains(location)
@@ -399,9 +386,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         // Avoid reapplying layout while dragging or snapping so user interaction wins.
         if case .dragging = panState { return }
         guard let containerView,
-              !heightAnimator.isAnimating,
-              !isTransitioningDetent,
-              !isLayoutStabilizing,
+              !isAnimating,
               !presentedViewController.isBeingDismissed else { return }
 
         guard !detentState.isEmpty else {
@@ -409,7 +394,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
             updateContainerFrame(height: fallback)
             return
         }
-        updateContainerFrame(height: detentState.currentHeight(in: containerView))
+        updateContainerFrame(height: detentState.currentHeight)
     }
 
     @objc private func handleDimmingTap() {
@@ -433,8 +418,8 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
                 return
             }
             
-            let minHeight = detentState.minHeight(in: container)
-            let softMaxHeight = detentState.maxHeight(in: container)
+            let minHeight = detentState.minHeight
+            let softMaxHeight = detentState.maxHeight
 
             let hardMaxHeight = container.bounds.height - container.safeAreaInsets.top
 
@@ -457,7 +442,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
             let finalHeight = wrapperHeightConstraint?.constant ?? panelView.frame.height
             let projected = finalHeight - (velocity.y * 0.2)
 
-            let minHeight = detentState.minHeight(in: container)
+            let minHeight = detentState.minHeight
 
             // Treat a strong downward gesture near the minimum detent as dismissal.
             let shouldDismiss = (
@@ -474,9 +459,9 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
                 return
             }
 
-            var target = detentState.nearest(to: projected, in: container)
+            var target = detentState.nearest(to: projected)
             if interactionMode == .scrolls && !context.isIndicatorInteraction && target > context.initialHeight {
-                target = detentState.nearest(to: context.initialHeight, in: container)
+                target = detentState.nearest(to: context.initialHeight)
             }
             animateTo(height: target, velocity: velocity.y)
 
@@ -491,25 +476,50 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
     }
 
     @objc internal func handleIndicatorTap() {
-        guard detentState.count > 1, let containerView else { return }
-        animateTo(height: detentState.next(in: containerView))
+        guard detentState.count > 1 else { return }
+        animateTo(height: detentState.next())
     }
-
+    
     private func animateTo(height: CGFloat, velocity: CGFloat = 0) {
         dismissKeyboardIfNeeded()
+        heightAnimator?.stopAnimation(true)
+        heightAnimator = nil
 
         let currentHeight = wrapperHeightConstraint?.constant ?? 0
-        isTransitioningDetent = true
+        let distance = height - currentHeight
+        let normalizedVelocity = distance != 0 ? velocity / distance : 0
+        let initialVelocity = CGVector(dx: normalizedVelocity, dy: normalizedVelocity)
 
-        heightAnimator.animate(
-            from: currentHeight,
-            to: height,
-            duration: PanelConstants.snapAnimationDuration
+        let timing = UISpringTimingParameters(
+            dampingRatio: PanelConstants.snapDampingRatio,
+            initialVelocity: initialVelocity
         )
-    }
+        let animator = UIViewPropertyAnimator(duration: PanelConstants.snapAnimationDuration, timingParameters: timing)
 
-    private func stopCurrentAnimation(finishAtEnd: Bool) {
-        heightAnimator.stop(finishAtEnd: finishAtEnd)
+        animator.addAnimations { [weak self] in
+            self?.updateContainerFrame(height: height)
+        }
+
+        animator.addCompletion { [weak self] position in
+            if position == .end {
+                self?.notifyDetentChange()
+            }
+            self?.heightAnimator = nil
+        }
+
+        heightAnimator = animator
+        animator.startAnimation()
+    }
+    
+    internal func stopCurrentAnimation(finishAtEnd: Bool) {
+        guard let animator = heightAnimator else { return }
+        if finishAtEnd {
+            animator.stopAnimation(false)
+            animator.finishAnimation(at: .end)
+        } else {
+            animator.stopAnimation(true)
+        }
+        heightAnimator = nil
     }
 
     private func resetPanState() {
@@ -520,8 +530,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
     }
 
     private func snapToDefault() {
-        guard let containerView else { return }
-        animateTo(height: detentState.minHeight(in: containerView))
+        animateTo(height: detentState.minHeight)
     }
 
     private func updateContainerFrame(height: CGFloat, isInteractive: Bool = false) {
@@ -559,160 +568,102 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
     
     @MainActor
     struct DetentState {
+
+        // MARK: - Nested Types
+
+        private struct CachedPanelDetent {
+            let detent: PanelDetent
+            let height: CGFloat
+        }
+
+        // MARK: - State
+
         private var _current: PanelDetent?
         var current: PanelDetent {
-            _current ?? sortedDetents().first ?? .large
+            _current ?? cachedDetents.first?.detent ?? .large
         }
-        
-        private func sortedDetents() -> [PanelDetent] {
-            let temp = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
-            return detents.sorted { $0.calculate(in: temp) < $1.calculate(in: temp) }
-        }
-        
-        
-        private var _cache: (size: CGSize, detents: [PanelDetent], heights: [CGFloat], sorted: [PanelDetent])?
 
         var detents: [PanelDetent] {
             didSet {
-                _cache = nil
-                if let c = _current, !detents.contains(c) {
-                    _current = nil
-                }
+                invalidate()
+                if let c = _current, !detents.contains(c) { _current = nil }
             }
         }
+
+        private var cachedDetents: [CachedPanelDetent] = []
+        private var cachedSize: CGSize?
+
+        var count: Int { detents.count }
+        var isEmpty: Bool { detents.isEmpty }
+
+        // MARK: - Init
 
         init(detents: [PanelDetent]) {
             self.detents = detents
         }
 
-        var count: Int { detents.count }
-        var isEmpty: Bool { detents.isEmpty }
+        // MARK: - Resolve
 
-        // MARK: - Cache
+        private mutating func invalidate() {
+            cachedDetents = []
+            cachedSize = nil
+        }
 
-        private mutating func resolve(in container: UIView) -> (heights: [CGFloat], sorted: [PanelDetent]) {
+        mutating func resolve(in container: UIView) {
             let size = container.bounds.size
-            if let cache = _cache, cache.size == size, cache.detents == detents {
-                return (cache.heights, cache.sorted)
-            }
+            guard cachedSize != size else { return }
+
             let largeHeight = PanelDetent.large.calculate(in: container)
             let maxHeight = container.bounds.height - container.safeAreaInsets.top
-            let sorted = detents.sorted { $0.calculate(in: container) < $1.calculate(in: container) }
-            let heights = sorted
-                .map { min($0.calculate(in: container), largeHeight, maxHeight) }
-                .reduce(into: [CGFloat]()) { result, value in
-                    if result.last != value { result.append(value) }
-                }
-            _cache = (size, detents, heights, sorted)
-            return (heights, sorted)
+
+            cachedDetents = detents
+                .map { CachedPanelDetent(detent: $0, height: min($0.calculate(in: container), largeHeight, maxHeight)) }
+                .sorted { $0.height < $1.height }
+
+            cachedSize = size
         }
 
         // MARK: - Query
 
-        mutating func currentHeight(in container: UIView) -> CGFloat {
-            let (heights, sorted) = resolve(in: container)
-            guard let idx = sorted.firstIndex(of: current) else { return heights.first ?? 0 }
-            return heights[min(idx, heights.count - 1)]
+        var currentHeight: CGFloat {
+            return cachedDetents.first { $0.detent == current }?.height ?? cachedDetents.first?.height ?? 0
         }
 
-        mutating func minHeight(in container: UIView) -> CGFloat {
-            resolve(in: container).heights.first ?? 0
+        var minHeight: CGFloat {
+            return cachedDetents.first?.height ?? 0
         }
 
-        mutating func maxHeight(in container: UIView) -> CGFloat {
-            resolve(in: container).heights.last ?? 0
+        var maxHeight: CGFloat {
+            return cachedDetents.last?.height ?? 0
         }
 
         // MARK: - Mutation
 
         /// To the next detent via indicator tap
-        mutating func next(in container: UIView) -> CGFloat {
-            let (heights, sorted) = resolve(in: container)
-            guard let idx = sorted.firstIndex(of: current) else { return heights.first ?? 0 }
-            let nextIdx = (idx + 1) % sorted.count
-            _current = sorted[nextIdx]
-            return heights[nextIdx]
+        mutating func next() -> CGFloat {
+            guard let idx = cachedDetents.firstIndex(where: { $0.detent == current }) else {
+                return cachedDetents.first?.height ?? 0
+            }
+            let next = cachedDetents[(idx + 1) % cachedDetents.count]
+            _current = next.detent
+            return next.height
         }
 
         /// To the nearest detent when dragging ends
-        mutating func nearest(to projected: CGFloat, in container: UIView) -> CGFloat {
-            let (heights, sorted) = resolve(in: container)
-            guard let (idx, height) = zip(sorted.indices, heights)
-                .min(by: { abs($0.1 - projected) < abs($1.1 - projected) }) else { return heights.first ?? 0 }
-            _current = sorted[idx]
-            return height
+        mutating func nearest(to projected: CGFloat) -> CGFloat {
+            guard let nearest = cachedDetents.min(by: { abs($0.height - projected) < abs($1.height - projected) }) else {
+                return cachedDetents.first?.height ?? 0
+            }
+            _current = nearest.detent
+            return nearest.height
         }
 
         /// To a specific detent from selectedDetent setter
-        mutating func move(to detent: PanelDetent, in container: UIView) -> CGFloat? {
+        mutating func move(to detent: PanelDetent) -> CGFloat? {
             guard detent != current else { return nil }
-            let (heights, sorted) = resolve(in: container)
-            guard let idx = sorted.firstIndex(of: detent) else { return nil }
-            _current = detent
-            return heights[min(idx, heights.count - 1)]
+            guard let cached = cachedDetents.first(where: { $0.detent == detent }) else { return nil }
+            _current = cached.detent
+            return cached.height
         }
-    }
-    
-    @MainActor
-    final class HeightAnimator {
-        // MARK: - Public
-
-        var isAnimating: Bool {
-            animator != nil
-        }
-
-        var onUpdate: ((CGFloat) -> Void)?
-        var onCompletion: (() -> Void)?
-
-        // MARK: - Private
-
-        private var animator: UIViewPropertyAnimator?
-
-        private let dampingRatio: CGFloat
-
-        // MARK: - Init
-        
-        init(dampingRatio: CGFloat) {
-            self.dampingRatio = dampingRatio
-        }
-
-        // MARK: - Animation
-
-        func animate(from startHeight: CGFloat, to targetHeight: CGFloat, duration: TimeInterval) {
-            stop(finishAtEnd: false)
-
-            let timing = UISpringTimingParameters(
-                dampingRatio: dampingRatio,
-                initialVelocity: .zero
-            )
-            
-            let animator = UIViewPropertyAnimator(duration: duration, timingParameters: timing)
-            
-            animator.addAnimations {
-                self.onUpdate?(targetHeight)
-            }
-            
-            animator.addCompletion { [weak self] position in
-                guard let self else { return }
-                if position == .end {
-                    self.onCompletion?()
-                }
-                self.animator = nil
-            }
-            
-            self.animator = animator
-            animator.startAnimation()
-        }
-
-        func stop(finishAtEnd: Bool) {
-            guard let animator else { return }
-            if finishAtEnd {
-                animator.stopAnimation(false)
-                animator.finishAnimation(at: .end)
-            } else {
-                animator.stopAnimation(true)
-            }
-            self.animator = nil
-        }
-    }
+    }    
 }
