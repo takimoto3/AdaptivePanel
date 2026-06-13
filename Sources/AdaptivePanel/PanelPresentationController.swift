@@ -135,19 +135,6 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
     var onDismiss: (() -> Void)?
     var backgroundInteraction: PanelBackgroundInteraction = PanelBackgroundInteractionKey.defaultValue
     
-    internal lazy var heightAnimator: HeightAnimator = {
-        let animator = HeightAnimator(
-            dampingRatio: PanelConstants.snapDampingRatio
-        )
-        animator.onUpdate = { [weak self] height in
-            self?.updateContainerFrame(height: height)
-        }
-        animator.onCompletion = { [weak self] in
-            self?.notifyDetentChange()
-        }
-        return animator
-    }()
-    
     internal var wrapperHeightConstraint: NSLayoutConstraint?
     internal let dragIndicatorView: UIView
 
@@ -162,6 +149,10 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
     }()
     
     override var presentedView: UIView? { panelView }
+    
+    internal var heightAnimator: UIViewPropertyAnimator?
+
+    internal var isAnimating: Bool { heightAnimator != nil }
 
     internal init(presentedViewController: UIViewController, presenting: UIViewController?, dragIndicator: UIView? = nil) {
         self.dragIndicatorView = dragIndicator ?? DragIndicatorView()
@@ -205,7 +196,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
 
-        stopCurrentAnimation(finishAtEnd: true)        
+        stopCurrentAnimation(finishAtEnd: true)
         coordinator.animate(alongsideTransition: { [weak self] _ in
             guard let self, let container = self.containerView else { return }
             self.updateHorizontalLayout(for: size)
@@ -395,7 +386,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         // Avoid reapplying layout while dragging or snapping so user interaction wins.
         if case .dragging = panState { return }
         guard let containerView,
-              !heightAnimator.isAnimating,
+              !isAnimating,
               !presentedViewController.isBeingDismissed else { return }
 
         guard !detentState.isEmpty else {
@@ -488,19 +479,47 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         guard detentState.count > 1 else { return }
         animateTo(height: detentState.next())
     }
-
+    
     private func animateTo(height: CGFloat, velocity: CGFloat = 0) {
         dismissKeyboardIfNeeded()
-        let currentHeight = wrapperHeightConstraint?.constant ?? 0
-        heightAnimator.animate(
-            from: currentHeight,
-            to: height,
-            duration: PanelConstants.snapAnimationDuration
-        )
-    }
+        heightAnimator?.stopAnimation(true)
+        heightAnimator = nil
 
-    private func stopCurrentAnimation(finishAtEnd: Bool) {
-        heightAnimator.stop(finishAtEnd: finishAtEnd)
+        let currentHeight = wrapperHeightConstraint?.constant ?? 0
+        let distance = height - currentHeight
+        let normalizedVelocity = distance != 0 ? velocity / distance : 0
+        let initialVelocity = CGVector(dx: normalizedVelocity, dy: normalizedVelocity)
+
+        let timing = UISpringTimingParameters(
+            dampingRatio: PanelConstants.snapDampingRatio,
+            initialVelocity: initialVelocity
+        )
+        let animator = UIViewPropertyAnimator(duration: PanelConstants.snapAnimationDuration, timingParameters: timing)
+
+        animator.addAnimations { [weak self] in
+            self?.updateContainerFrame(height: height)
+        }
+
+        animator.addCompletion { [weak self] position in
+            if position == .end {
+                self?.notifyDetentChange()
+            }
+            self?.heightAnimator = nil
+        }
+
+        heightAnimator = animator
+        animator.startAnimation()
+    }
+    
+    internal func stopCurrentAnimation(finishAtEnd: Bool) {
+        guard let animator = heightAnimator else { return }
+        if finishAtEnd {
+            animator.stopAnimation(false)
+            animator.finishAnimation(at: .end)
+        } else {
+            animator.stopAnimation(true)
+        }
+        heightAnimator = nil
     }
 
     private func resetPanState() {
@@ -646,68 +665,5 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
             _current = cached.detent
             return cached.height
         }
-    }
-    
-    @MainActor
-    final class HeightAnimator {
-        // MARK: - Public
-
-        var isAnimating: Bool {
-            animator != nil
-        }
-
-        var onUpdate: ((CGFloat) -> Void)?
-        var onCompletion: (() -> Void)?
-
-        // MARK: - Private
-
-        private var animator: UIViewPropertyAnimator?
-
-        private let dampingRatio: CGFloat
-
-        // MARK: - Init
-        
-        init(dampingRatio: CGFloat) {
-            self.dampingRatio = dampingRatio
-        }
-
-        // MARK: - Animation
-
-        func animate(from startHeight: CGFloat, to targetHeight: CGFloat, duration: TimeInterval) {
-            stop(finishAtEnd: false)
-
-            let timing = UISpringTimingParameters(
-                dampingRatio: dampingRatio,
-                initialVelocity: .zero
-            )
-            
-            let animator = UIViewPropertyAnimator(duration: duration, timingParameters: timing)
-            
-            animator.addAnimations {
-                self.onUpdate?(targetHeight)
-            }
-            
-            animator.addCompletion { [weak self] position in
-                guard let self else { return }
-                if position == .end {
-                    self.onCompletion?()
-                }
-                self.animator = nil
-            }
-            
-            self.animator = animator
-            animator.startAnimation()
-        }
-
-        func stop(finishAtEnd: Bool) {
-            guard let animator else { return }
-            if finishAtEnd {
-                animator.stopAnimation(false)
-                animator.finishAnimation(at: .end)
-            } else {
-                animator.stopAnimation(true)
-            }
-            self.animator = nil
-        }
-    }
+    }    
 }

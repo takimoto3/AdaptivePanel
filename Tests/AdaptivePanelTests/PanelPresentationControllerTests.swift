@@ -572,9 +572,9 @@ struct PanelPresentationControllerTests {
         pan.mockVelocity = CGPoint(x: 0, y: PanelConstants.dismissVelocityThreshold + 1)
         pc.presentedView?.addGestureRecognizer(pan)
         
-        #expect(pc.heightAnimator.isAnimating == false)
+        #expect(pc.isAnimating == false)
         pc.handlePan(pan)
-        #expect(pc.heightAnimator.isAnimating == true) // snapToDefault animator is running
+        #expect(pc.isAnimating == true) // snapToDefault animator is running
     }
     
     @Test func handlePan_ended_snapsToNearestDetent() {
@@ -599,9 +599,9 @@ struct PanelPresentationControllerTests {
         pan.mockVelocity = CGPoint(x: 0, y: 0) // no velocity
         pc.presentedView?.addGestureRecognizer(pan)
         
-        #expect(pc.heightAnimator.isAnimating == false)
+        #expect(pc.isAnimating == false)
         pc.handlePan(pan)
-        #expect(pc.heightAnimator.isAnimating == true) // snap animator is running
+        #expect(pc.isAnimating == true) // snap animator is running
     }
     
     @Test func handlePan_cancelled_springsBackToInitialHeightAndResetsPanState() {
@@ -625,12 +625,12 @@ struct PanelPresentationControllerTests {
         pc.presentedView?.addGestureRecognizer(pan)
         
         #expect(pc.panState != .idle)
-        #expect(pc.heightAnimator.isAnimating == false)
+        #expect(pc.isAnimating == false)
         pc.handlePan(pan)
         #expect(pc.panState == .idle)
-        #expect(pc.heightAnimator.isAnimating == true)
+        #expect(pc.isAnimating == true)
         
-        pc.heightAnimator.stop(finishAtEnd: true)
+        pc.stopCurrentAnimation(finishAtEnd: true)
         #expect(pc.wrapperHeightConstraint?.constant == 300)
     }
     
@@ -655,12 +655,12 @@ struct PanelPresentationControllerTests {
         pc.presentedView?.addGestureRecognizer(pan)
         
         #expect(pc.panState != .idle)
-        #expect(pc.heightAnimator.isAnimating == false)
+        #expect(pc.isAnimating == false)
         pc.handlePan(pan)
         #expect(pc.panState == .idle)
-        #expect(pc.heightAnimator.isAnimating == true)
+        #expect(pc.isAnimating == true)
         
-        pc.heightAnimator.stop(finishAtEnd: true)
+        pc.stopCurrentAnimation(finishAtEnd: true)
         #expect(pc.wrapperHeightConstraint?.constant == 300)
     }
     
@@ -813,7 +813,7 @@ struct PanelPresentationControllerTests {
         pc.handlePan(pan)
         
         // Verify snap triggered if animator is active
-        #expect(pc.heightAnimator.isAnimating != false)
+        #expect(pc.isAnimating != false)
         
         // Final height should not exceed initialHeight
         // (Verify target height set in wrapperHeightConstraint during animation)
@@ -935,7 +935,7 @@ struct PanelPresentationControllerTests {
         pc.handleIndicatorTap()
         
         #expect(pc.detentState.current == .medium)
-        #expect(pc.heightAnimator.isAnimating == false)
+        #expect(pc.isAnimating == false)
     }
     
     @Test func applyDetentLayout_emptyDetents_fallsBackToHalfContainerHeight() {
@@ -1189,7 +1189,7 @@ struct PanelPresentationControllerTests {
         let pc = makePresentationController()
         pc.panelDetents = [.medium, .large]
         pc.selectedDetent = .large
-        #expect(pc.heightAnimator.isAnimating == false)
+        #expect(pc.isAnimating == false)
     }
     
     // MARK: - notifyDetentChange
