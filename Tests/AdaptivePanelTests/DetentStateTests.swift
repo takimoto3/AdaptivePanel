@@ -21,9 +21,11 @@ struct DetentStateTests {
     }
 
     // MARK: - init
-
+    
     @Test func init_current_returnsSortedFirst() {
-        let state = DetentState(detents: [.large, .medium])
+        var state = DetentState(detents: [.large, .medium])
+        let container = makeContainer()
+        state.resolve(in: container)
         // sorted: [medium, large] -> current = medium
         #expect(state.current == .medium)
     }
@@ -34,17 +36,21 @@ struct DetentStateTests {
     }
 
     @Test func init_singleDetent_currentIsThatDetent() {
-        let state = DetentState(detents: [.medium])
+        var state = DetentState(detents: [.medium])
+        let container = makeContainer()
+        state.resolve(in: container)
         #expect(state.current == .medium)
     }
+
 
     // MARK: - detents.didSet
 
     @Test func detents_didSet_currentContained_preservesCurrent() {
         var state = DetentState(detents: [.medium, .large])
         let container = makeContainer()
+        state.resolve(in: container)
         // Force _current to .large via move
-        _ = state.move(to: .large, in: container)
+        _ = state.move(to: .large)
         #expect(state.current == .large)
 
         // Update detents still containing .large
@@ -55,21 +61,25 @@ struct DetentStateTests {
     @Test func detents_didSet_currentNotContained_resetsToSortedFirst() {
         var state = DetentState(detents: [.medium, .large])
         let container = makeContainer()
-        _ = state.move(to: .large, in: container)
+        state.resolve(in: container)
+        _ = state.move(to: .large)
         #expect(state.current == .large)
 
         // Remove .large -> _current = nil -> sorted.first = .medium
         state.detents = [.medium]
+        state.resolve(in: container)
         #expect(state.current == .medium)
     }
 
     @Test func detents_didSet_invalidatesCache() {
         var state = DetentState(detents: [.medium, .large])
         let container = makeContainer()
-        let height1 = state.currentHeight(in: container)
+        state.resolve(in: container)
+        let height1 = state.currentHeight
 
         state.detents = [.large]
-        let height2 = state.currentHeight(in: container)
+        state.resolve(in: container)
+        let height2 = state.currentHeight
 
         #expect(height1 != height2)
     }
@@ -79,17 +89,19 @@ struct DetentStateTests {
     @Test func currentHeight_nilCurrent_returnsFirst() {
         var state = DetentState(detents: [.medium, .large])
         let container = makeContainer()
+        state.resolve(in: container)
         // _current is nil -> returns heights.first = medium height
         let expected = PanelDetent.medium.calculate(in: container)
-        #expect(state.currentHeight(in: container) == expected)
+        #expect(state.currentHeight == expected)
     }
 
     @Test func currentHeight_afterMove_returnsCorrectHeight() {
         var state = DetentState(detents: [.medium, .large])
         let container = makeContainer()
-        _ = state.move(to: .large, in: container)
+        state.resolve(in: container)
+        _ = state.move(to: .large)
         let expected = PanelDetent.large.calculate(in: container)
-        #expect(state.currentHeight(in: container) == expected)
+        #expect(state.currentHeight == expected)
     }
 
     // MARK: - minHeight / maxHeight
@@ -97,15 +109,17 @@ struct DetentStateTests {
     @Test func minHeight_returnsMediumHeight() {
         var state = DetentState(detents: [.medium, .large])
         let container = makeContainer()
+        state.resolve(in: container)
         let expected = PanelDetent.medium.calculate(in: container)
-        #expect(state.minHeight(in: container) == expected)
+        #expect(state.minHeight == expected)
     }
 
     @Test func maxHeight_returnsLargeHeight() {
         var state = DetentState(detents: [.medium, .large])
         let container = makeContainer()
+        state.resolve(in: container)
         let expected = PanelDetent.large.calculate(in: container)
-        #expect(state.maxHeight(in: container) == expected)
+        #expect(state.maxHeight == expected)
     }
 
     // MARK: - next
@@ -113,8 +127,9 @@ struct DetentStateTests {
     @Test func next_mediumToLarge() {
         var state = DetentState(detents: [.medium, .large])
         let container = makeContainer()
+        state.resolve(in: container)
         // current = medium -> next = large
-        let height = state.next(in: container)
+        let height = state.next()
         #expect(state.current == .large)
         #expect(height == PanelDetent.large.calculate(in: container))
     }
@@ -122,8 +137,9 @@ struct DetentStateTests {
     @Test func next_largeCyclesToMedium() {
         var state = DetentState(detents: [.medium, .large])
         let container = makeContainer()
-        _ = state.move(to: .large, in: container)
-        let height = state.next(in: container)
+        state.resolve(in: container)
+        _ = state.move(to: .large)
+        let height = state.next()
         #expect(state.current == .medium)
         #expect(height == PanelDetent.medium.calculate(in: container))
     }
@@ -133,18 +149,20 @@ struct DetentStateTests {
     @Test func nearest_closerToMedium_selectsMedium() {
         var state = DetentState(detents: [.medium, .large])
         let container = makeContainer()
+        state.resolve(in: container)
         let mediumHeight = PanelDetent.medium.calculate(in: container)
         let projected = mediumHeight + 10
-        _ = state.nearest(to: projected, in: container)
+        _ = state.nearest(to: projected)
         #expect(state.current == .medium)
     }
 
     @Test func nearest_closerToLarge_selectsLarge() {
         var state = DetentState(detents: [.medium, .large])
         let container = makeContainer()
+        state.resolve(in: container)
         let largeHeight = PanelDetent.large.calculate(in: container)
         let projected = largeHeight - 10
-        _ = state.nearest(to: projected, in: container)
+        _ = state.nearest(to: projected)
         #expect(state.current == .large)
     }
 
@@ -153,15 +171,17 @@ struct DetentStateTests {
     @Test func move_sameCurrent_returnsNil() {
         var state = DetentState(detents: [.medium, .large])
         let container = makeContainer()
+        state.resolve(in: container)
         // current = medium (sorted.first)
-        let result = state.move(to: .medium, in: container)
+        let result = state.move(to: .medium)
         #expect(result == nil)
     }
 
     @Test func move_differentDetent_returnsHeightAndUpdatesCurrent() {
         var state = DetentState(detents: [.medium, .large])
         let container = makeContainer()
-        let result = state.move(to: .large, in: container)
+        state.resolve(in: container)
+        let result = state.move(to: .large)
         #expect(result != nil)
         #expect(state.current == .large)
         #expect(result == PanelDetent.large.calculate(in: container))
@@ -170,7 +190,8 @@ struct DetentStateTests {
     @Test func move_detentNotInList_returnsNil() {
         var state = DetentState(detents: [.medium])
         let container = makeContainer()
-        let result = state.move(to: .large, in: container)
+        state.resolve(in: container)
+        let result = state.move(to: .large)
         #expect(result == nil)
         #expect(state.current == .medium)
     }
@@ -180,8 +201,9 @@ struct DetentStateTests {
     @Test func cache_sameContainerAndDetents_doesNotRecalculate() {
         var state = DetentState(detents: [.medium, .large])
         let container = makeContainer()
-        let h1 = state.currentHeight(in: container)
-        let h2 = state.currentHeight(in: container)
+        state.resolve(in: container)
+        let h1 = state.currentHeight
+        let h2 = state.currentHeight
         #expect(h1 == h2)
     }
 
@@ -189,8 +211,10 @@ struct DetentStateTests {
         var state = DetentState(detents: [.medium, .large])
         let container1 = makeContainer(width: 390, height: 844)
         let container2 = makeContainer(width: 390, height: 932)
-        let h1 = state.currentHeight(in: container1)
-        let h2 = state.currentHeight(in: container2)
+        state.resolve(in: container1)
+        let h1 = state.currentHeight
+        state.resolve(in: container2)
+        let h2 = state.currentHeight
         #expect(h1 != h2)
     }
 }

@@ -1204,7 +1204,8 @@ struct PanelPresentationControllerTests {
         pc.panelDetents = [.medium, .large]
         var received: PanelDetent?
         pc.onDetentChange = { received = $0 }
-        _ = pc.detentState.move(to: .large, in: container)
+        pc.detentState.resolve(in: container)
+        _ = pc.detentState.move(to: .large)
         pc.notifyDetentChange()
         #expect(received == .large)
     }
