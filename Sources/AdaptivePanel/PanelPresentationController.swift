@@ -114,7 +114,6 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
     }
 
     var isInteractiveDismissDisabled = false
-    internal var isTransitioningDetent = false
     var panelCornerRadius: CGFloat? {
         didSet {
             applyCornerRadius(panelCornerRadius ?? PanelConstants.cornerRadius)
@@ -144,9 +143,6 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
             self?.updateContainerFrame(height: height)
         }
         animator.onCompletion = { [weak self] in
-            self?.isTransitioningDetent = false
-            self?.isLayoutStabilizing = true
-            self?.isLayoutStabilizing = false
             self?.notifyDetentChange()
         }
         return animator
@@ -165,8 +161,6 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         return gesture
     }()
     
-    private var isLayoutStabilizing = false
-
     override var presentedView: UIView? { panelView }
 
     internal init(presentedViewController: UIViewController, presenting: UIViewController?, dragIndicator: UIView? = nil) {
@@ -211,9 +205,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
 
-        stopCurrentAnimation(finishAtEnd: true)
-//        wrapperHeightConstraint?.constant = 0
-        
+        stopCurrentAnimation(finishAtEnd: true)        
         coordinator.animate(alongsideTransition: { [weak self] _ in
             guard let self, let container = self.containerView else { return }
             self.updateHorizontalLayout(for: size)
@@ -404,8 +396,6 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         if case .dragging = panState { return }
         guard let containerView,
               !heightAnimator.isAnimating,
-              !isTransitioningDetent,
-              !isLayoutStabilizing,
               !presentedViewController.isBeingDismissed else { return }
 
         guard !detentState.isEmpty else {
@@ -501,10 +491,7 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
 
     private func animateTo(height: CGFloat, velocity: CGFloat = 0) {
         dismissKeyboardIfNeeded()
-
         let currentHeight = wrapperHeightConstraint?.constant ?? 0
-        isTransitioningDetent = true
-
         heightAnimator.animate(
             from: currentHeight,
             to: height,
