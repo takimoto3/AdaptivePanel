@@ -50,9 +50,6 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
     
     internal var panState: PanState = .idle
     internal var portraitConstraints: [NSLayoutConstraint] = []
-    private var widthConstraint: NSLayoutConstraint?
-    private var alignmentConstraint: NSLayoutConstraint?
-    private var cachedAlignment: PanelLandscapeAlignment?
 
     internal var activeHorizontalConstraints: [NSLayoutConstraint] = [] {
         didSet {
@@ -64,7 +61,6 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
 
     var landscapeConfiguration: PanelLandscapeConfiguration = .default {
         didSet {
-            cachedAlignment = nil
             if let container = containerView {
                 updateHorizontalLayout(for: container.bounds.size)
                 container.setNeedsLayout()
@@ -340,46 +336,33 @@ internal class PanelPresentationController: UIPresentationController, PanelPrefe
         }
     }
 
-
     private func updateHorizontalLayout(for size: CGSize) {
         guard let container = containerView else { return }
         let isLandscape = size.width > size.height
 
         if isLandscape {
-            let isFull = landscapeConfiguration.width == .full
-                || landscapeConfiguration.width == .fraction(1.0)
+            let isFull = landscapeConfiguration.width == .full || landscapeConfiguration.width == .fraction(1.0)
             let effectiveAlignment: PanelLandscapeAlignment = isFull ? .center : landscapeConfiguration.alignment
+            
+            let leadingWall = landscapeConfiguration.ignoreSafeArea ? container.leadingAnchor : container.safeAreaLayoutGuide.leadingAnchor
+            let trailingWall = landscapeConfiguration.ignoreSafeArea ? container.trailingAnchor : container.safeAreaLayoutGuide.trailingAnchor
 
-            if cachedAlignment != effectiveAlignment {
-                rebuildAlignmentConstraint(in: container, alignment: effectiveAlignment)
+            let alignmentConstraint: NSLayoutConstraint
+            switch effectiveAlignment {
+            case .leading(let space):
+                alignmentConstraint = panelView.leadingAnchor.constraint(equalTo: leadingWall, constant: space)
+            case .trailing(let space):
+                alignmentConstraint = panelView.trailingAnchor.constraint(equalTo: trailingWall, constant: -space)
+            case .center:
+                alignmentConstraint = panelView.centerXAnchor.constraint(equalTo: container.centerXAnchor)
             }
-            widthConstraint?.constant = landscapeConfiguration.width.calculate(in: container)
-            activeHorizontalConstraints = [widthConstraint, alignmentConstraint].compactMap { $0 }
+
+            let widthConstraint = panelView.widthAnchor.constraint(equalToConstant: landscapeConfiguration.width.calculate(in: container))
+
+            activeHorizontalConstraints = [widthConstraint, alignmentConstraint]
         } else {
             activeHorizontalConstraints = portraitConstraints
-            widthConstraint = nil
-            alignmentConstraint = nil
-            cachedAlignment = nil
         }
-    }
-
-    private func rebuildAlignmentConstraint(in container: UIView, alignment: PanelLandscapeAlignment) {
-        let leadingWall = landscapeConfiguration.ignoreSafeArea ? container.leadingAnchor : container.safeAreaLayoutGuide.leadingAnchor
-        let trailingWall = landscapeConfiguration.ignoreSafeArea ? container.trailingAnchor : container.safeAreaLayoutGuide.trailingAnchor
-
-        if widthConstraint == nil {
-            widthConstraint = panelView.widthAnchor.constraint(equalToConstant: 0)
-        }
-
-        switch alignment {
-        case .leading(let space):
-            alignmentConstraint = panelView.leadingAnchor.constraint(equalTo: leadingWall, constant: space)
-        case .trailing(let space):
-            alignmentConstraint = panelView.trailingAnchor.constraint(equalTo: trailingWall, constant: -space)
-        case .center:
-            alignmentConstraint = panelView.centerXAnchor.constraint(equalTo: container.centerXAnchor)
-        }
-        cachedAlignment = alignment
     }
 
     internal func applyDetentLayout() {

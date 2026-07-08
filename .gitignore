@@ -13,3 +13,6 @@ TestResults/
 
 # IDEs
 .vscode/
+
+# Agent workspace configurations
+.agents/
