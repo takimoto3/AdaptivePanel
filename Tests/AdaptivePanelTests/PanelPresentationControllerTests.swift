@@ -702,7 +702,7 @@ struct PanelPresentationControllerTests {
         // Panel height should not change because scroll view is not at top
         #expect(pc.wrapperHeightConstraint?.constant == before)
     }
-       
+    
     // MARK: .changed - Resistance is not applied in scrolls mode even when below min height
     
     /// Verify that resistance correction is not applied when interactionMode == .scrolls
@@ -821,7 +821,7 @@ struct PanelPresentationControllerTests {
         let finalHeight = pc.wrapperHeightConstraint?.constant ?? 0
         #expect(finalHeight <= initialHeight)
     }
-
+    
     // MARK: - restoreScrollViews
     
     @Test func restoreScrollViews_whenDragging_enablesScrollViewPanGesture() {
@@ -914,15 +914,15 @@ struct PanelPresentationControllerTests {
             presenting: UIViewController()
         )
         pc.panelDetents = [.medium, .large]
-
+        
         // medium -> large
         pc.handleIndicatorTap()
         #expect(pc.detentState.current == .large)
-
+        
         // large -> medium (cycle)
         pc.handleIndicatorTap()
         #expect(pc.detentState.current == .medium)
-    }    
+    }
     @Test func handleIndicatorTap_singleDetent_doesNothing() {
         let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         let pc = TestablePanelPresentationController(
@@ -1095,35 +1095,6 @@ struct PanelPresentationControllerTests {
         #expect(presenting.view.tintAdjustmentMode == .dimmed)
     }
     
-    @Test func updateHorizontalLayout_portrait_usesPortraitConstraints() {
-        let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
-        let pc = TestablePanelPresentationController(
-            containerView: container,
-            presentedViewController: UIViewController(),
-            presenting: UIViewController()
-        )
-        pc.addPanelViewToContainer()
-        
-        pc.landscapeConfiguration = PanelLandscapeConfiguration(alignment: .center, width: .width(300), ignoreSafeArea: true)
-        // Back to portrait size
-        pc.landscapeConfiguration = .default
-        
-        #expect(pc.activeHorizontalConstraints == pc.portraitConstraints)
-    }
-    
-    @Test func updateHorizontalLayout_landscape_fullWidth_usesLandscapeConstraints() {
-        let container = UIView(frame: CGRect(x: 0, y: 0, width: 844, height: 390))
-        let pc = TestablePanelPresentationController(
-            containerView: container,
-            presentedViewController: UIViewController(),
-            presenting: UIViewController()
-        )
-        pc.addPanelViewToContainer()
-        
-        pc.landscapeConfiguration = PanelLandscapeConfiguration(alignment: .center, width: .full, ignoreSafeArea: true)
-        
-        #expect(pc.activeHorizontalConstraints != pc.portraitConstraints)
-    }
     
     // MARK: - PanContext ==
     
@@ -1228,7 +1199,7 @@ struct PanelPresentationControllerTests {
     }
     
     // MARK: - updateHorizontalLayout landscape full/fraction(1.0) forces center
-
+    
     @Test func updateHorizontalLayout_fullWidth_forcesCenter() {
         let container = UIView(frame: CGRect(x: 0, y: 0, width: 844, height: 390))
         let pc = TestablePanelPresentationController(
@@ -1237,20 +1208,20 @@ struct PanelPresentationControllerTests {
             presenting: UIViewController()
         )
         pc.addPanelViewToContainer()
-
+        
         // Set with leading + compact
         pc.landscapeConfiguration = PanelLandscapeConfiguration(
             alignment: .leading(), width: .compact, ignoreSafeArea: true
         )
         let constraintsWithCompact = pc.activeHorizontalConstraints
-
+        
         // Change to full -> Rebuild constraints as it is forced to center
         pc.landscapeConfiguration = PanelLandscapeConfiguration(
             alignment: .leading(), width: .full, ignoreSafeArea: true
         )
         #expect(pc.activeHorizontalConstraints != constraintsWithCompact)
     }
-
+    
     @Test func updateHorizontalLayout_fraction1_forcesCenter() {
         let container = UIView(frame: CGRect(x: 0, y: 0, width: 844, height: 390))
         let pc = TestablePanelPresentationController(
@@ -1259,15 +1230,46 @@ struct PanelPresentationControllerTests {
             presenting: UIViewController()
         )
         pc.addPanelViewToContainer()
-
+        
         pc.landscapeConfiguration = PanelLandscapeConfiguration(
             alignment: .leading(), width: .compact, ignoreSafeArea: true
         )
         let constraintsWithCompact = pc.activeHorizontalConstraints
-
+        
         pc.landscapeConfiguration = PanelLandscapeConfiguration(
             alignment: .leading(), width: .fraction(1.0), ignoreSafeArea: true
         )
         #expect(pc.activeHorizontalConstraints != constraintsWithCompact)
     }
+    
+    @Test func updateHorizontalLayout_portrait_usesPortraitConstraints() {
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let pc = TestablePanelPresentationController(
+            containerView: container,
+            presentedViewController: UIViewController(),
+            presenting: UIViewController()
+        )
+        pc.addPanelViewToContainer()
+        
+        pc.landscapeConfiguration = PanelLandscapeConfiguration(alignment: .center, width: .width(300), ignoreSafeArea: true)
+        // Back to portrait size
+        pc.landscapeConfiguration = .default
+        
+        #expect(pc.activeHorizontalConstraints == pc.portraitConstraints)
+    }
+    
+    @Test func updateHorizontalLayout_landscape_fullWidth_usesLandscapeConstraints() {
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: 844, height: 390))
+        let pc = TestablePanelPresentationController(
+            containerView: container,
+            presentedViewController: UIViewController(),
+            presenting: UIViewController()
+        )
+        pc.addPanelViewToContainer()
+        
+        pc.landscapeConfiguration = PanelLandscapeConfiguration(alignment: .center, width: .full, ignoreSafeArea: true)
+        
+        #expect(pc.activeHorizontalConstraints != pc.portraitConstraints)
+    }
+
 }
